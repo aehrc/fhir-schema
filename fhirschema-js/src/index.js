@@ -17,24 +17,24 @@ function formatValue(v) {
 function getType(input) {
   const type = Object.prototype.toString.call(input);
   switch (type) {
-  case "[object Array]":
-    return "array";
-  case "[object Object]":
-    return "object";
-  case "[object String]":
-    return "string";
-  case "[object Number]":
-    return "number";
-  case "[object Boolean]":
-    return "boolean";
-  case "[object Null]":
-    return "null";
-  case "[object Undefined]":
-    return "null";
-  case "[object Date]":
-    return "date";
-  default:
-    return "unknown";
+    case "[object Array]":
+      return "array";
+    case "[object Object]":
+      return "object";
+    case "[object String]":
+      return "string";
+    case "[object Number]":
+      return "number";
+    case "[object Boolean]":
+      return "boolean";
+    case "[object Null]":
+      return "null";
+    case "[object Undefined]":
+      return "null";
+    case "[object Date]":
+      return "date";
+    default:
+      return "unknown";
   }
 }
 
@@ -53,9 +53,9 @@ function addError(result, type, message) {
 
 const fhirPrimitiveTypeValidators = {
   integer: (data, schema) =>
-  Number.isSafeInteger(data)
-    ? null
-    : `expected ${schema.type}, got ${getType(data)}`,
+    Number.isSafeInteger(data)
+      ? null
+      : `expected ${schema.type}, got ${getType(data)}`,
   string: (data, schema) => {
     if (!(getType(data) === "string")) {
       return `expected ${schema.type}, got ${getType(data)}`;
@@ -83,9 +83,8 @@ function validatePrimitiveType(ctx, result, schema, data) {
   console.assert(
     primitiveValidator,
     `No validator for primititve type ${schema.type} of schema`,
-    schema
+    schema,
   );
-
 
   const err = primitiveValidator(data, schema);
 
@@ -198,8 +197,7 @@ function validateConstraints(ctx, result, schema, data) {
   });
 }
 
-function validateFixed(ctx, result, schema, data) {
-  const fixedValue = schema.fixed;
+function validateFixed(ctx, result, fixedValue, data) {
   if (!_.isEqual(data, fixedValue)) {
     addError(
       result,
@@ -209,8 +207,7 @@ function validateFixed(ctx, result, schema, data) {
   }
 }
 
-function validatePattern(ctx, result, schema, data) {
-  const patternValue = schema.pattern;
+function validatePattern(ctx, result, patternValue, data) {
   if (!_.isMatch(data, patternValue)) {
     addError(
       result,
@@ -285,7 +282,11 @@ function validateBinding(ctx, result, schema, data) {
 
 function validateChoices(ctx, result, schema, data) {
   let item = result.path[result.path.length - 1];
-  if(! schema.some((x)=> { return item == x })) {
+  if (
+    !schema.some((x) => {
+      return item == x;
+    })
+  ) {
     addError(result, "choice-excluded", `${item} is excluded choice`);
   }
 }
@@ -338,16 +339,15 @@ function validateSlices(ctx, result, schemas, data) {
     });
 }
 
-
 let VALIDATORS = {
-  fixed:       validateFixed,
-  pattern:     validatePattern,
+  fixed: validateFixed,
+  pattern: validatePattern,
   constraints: validateConstraints,
-  required:    validateRequired,
-  excluded:    validateExcluded,
-  binding:     validateBinding,
-  elements:    validateElements,
-  choices:     validateChoices,
+  required: validateRequired,
+  excluded: validateExcluded,
+  binding: validateBinding,
+  elements: validateElements,
+  choices: validateChoices,
   // array:       validateArray,
 };
 
@@ -403,25 +403,25 @@ function addSchemasToSet(ctx, set, schema, schemaName) {
   if (schema) {
     if (schema.base && !set[schema.base]) {
       let sch = resolveSchema(ctx, schema.base);
-      if(sch){
+      if (sch) {
         addSchemasToSet(ctx, set, sch, schema.base);
       } else {
-        console.assert(false, `Schema ${name} is not found`)
+        console.assert(false, `Schema ${name} is not found`);
       }
     }
     if (schema.type && !set[schema.type] && schema.kind !== "primitive-type") {
       let sch = resolveSchema(ctx, schema.type);
       if (sch) {
-        addSchemasToSet(ctx, set, sch,  schema.type);
+        addSchemasToSet(ctx, set, sch, schema.type);
       } else {
-        console.assert(false, `Schema ${name} is not found`)
+        console.assert(false, `Schema ${name} is not found`);
       }
     }
 
-    if( schema.name ){
+    if (schema.name) {
       set[schema.name] = schema;
     } else {
-      console.assert(false, "There is no name for schema", schema)
+      console.assert(false, "There is no name for schema", schema);
     }
   }
 }
@@ -465,127 +465,126 @@ function checkChoiceIsIncludedInChoiceList(metChoices, schema, result) {
   });
 }
 
-
 const IGNORE = {
-  "kind": true,
-  "name": true,
-  "type": true,
-  "array": true,
-  "base": true,
-  "slicing": true,
-  "extensions": true
-}
+  kind: true,
+  name: true,
+  type: true,
+  array: true,
+  base: true,
+  slicing: true,
+  extensions: true,
+};
 
 function evalValidators(ctx, result, schemas, data) {
   // basic keyword validators
   each(schemas, (schk, sch) => {
-    each(sch, (key,subsch)=>{
-      let validator = VALIDATORS[key]
-      if (validator){
-        validator(ctx, result, subsch, data)
+    each(sch, (key, subsch) => {
+      let validator = VALIDATORS[key];
+      if (validator) {
+        validator(ctx, result, subsch, data);
       } else {
-        if(!IGNORE[key] && !ARRAY_VALIDATORS[key]) {
-          console.log(`No validator for ${key}`)
+        if (!IGNORE[key] && !ARRAY_VALIDATORS[key]) {
+          console.log(`No validator for ${key}`);
         }
       }
-    })
-      });
+    });
+  });
 }
 
 function collectSchemasForElement(ctx, elset, schemas, evalCtx, k) {
-
   // extensions
-  if(k == 'extension') {
-    let slicing = {slices: {}}
-    each(schemas, (schemaPath,schema)=> {
-      if(schema.extensions){
-        each(schema.extensions,(extName, ext)=>{
-          let extSch = resolveSchema(ctx, ext.url)
-          if(!extSch) { console.log('could not resolve ', ext.url) }
-          let sch = Object.assign({}, ext)
+  if (k == "extension") {
+    let slicing = { slices: {} };
+    each(schemas, (schemaPath, schema) => {
+      if (schema.extensions) {
+        each(schema.extensions, (extName, ext) => {
+          let extSch = resolveSchema(ctx, ext.url);
+          if (!extSch) {
+            console.log("could not resolve ", ext.url);
+          }
+          let sch = Object.assign({}, ext);
           delete sch.min;
           delete sch.max;
           delete sch.url;
           slicing.slices[extName] = {
             match: {
-              type: 'pattern',
-              value: {url: ext.url}
+              type: "pattern",
+              value: { url: ext.url },
             },
             max: ext.max,
             min: ext.min,
-            schema: Object.assign(sch,extSch)
-          }
-        })
+            schema: Object.assign(sch, extSch),
+          };
+        });
       }
-    })
+    });
     // console.log('slicing', slicing)
-    addSchemasToSet(ctx, elset, {slicing: slicing}, 'extension');
+    addSchemasToSet(ctx, elset, { slicing: slicing }, "extension");
   }
 
   let choiceOf = null;
   each(schemas, (schk, sch) => {
     let subsch = sch?.elements?.[k];
 
-
-    if (subsch && ! subsch.choices ) {
+    if (subsch && !subsch.choices) {
       subsch.name = sch.name + "." + k; // TODO FIXME
       addSchemasToSet(ctx, elset, subsch);
     }
-    if(subsch && subsch.choiceOf) {
-      choiceOf = subsch.choiceOf
-      evalCtx.multiChoice[choiceOf] ||= []
-      evalCtx.multiChoice[choiceOf].push(k)
+    if (subsch && subsch.choiceOf) {
+      choiceOf = subsch.choiceOf;
+      evalCtx.multiChoice[choiceOf] ||= [];
+      evalCtx.multiChoice[choiceOf].push(k);
     }
   });
 
   // if we found choiceOf - we have to collect all choice branches from all schemas
-  if(choiceOf){
-    each(schemas, (nm, sch)=>{
-      let choicesch = sch?.elements?.[choiceOf]
-      if(choicesch){
+  if (choiceOf) {
+    each(schemas, (nm, sch) => {
+      let choicesch = sch?.elements?.[choiceOf];
+      if (choicesch) {
         choicesch.name = sch.name + "." + k; // TODO FIXME
         addSchemasToSet(ctx, elset, choicesch);
       }
-    })
+    });
   }
 }
 
 function isElementArray(elset) {
-  return Object.keys(elset).some((nm)=>{
-    let sch = elset[nm]
-    if(sch.array){
-      return  true
+  return Object.keys(elset).some((nm) => {
+    let sch = elset[nm];
+    if (sch.array) {
+      return true;
     }
-  })
+  });
 }
 
 function validateArrayType(result, elset, k, v) {
-  if(isElementArray(elset)){
-    if(! Array.isArray(v)){
+  if (isElementArray(elset)) {
+    if (!Array.isArray(v)) {
       addError(result, "not-array", `${k} is not array`);
     }
   } else {
-    if(Array.isArray(v)){
+    if (Array.isArray(v)) {
       addError(result, "not-singular", `${k} is not singular`);
     }
   }
 }
 
 function isEmpty(elset) {
-  return Object.keys(elset).length === 0
+  return Object.keys(elset).length === 0;
 }
 
 function evalElement(ctx, result, schemas, evalCtx, k, v) {
   let elset = set();
 
-  collectSchemasForElement(ctx, elset, schemas, evalCtx, k)
+  collectSchemasForElement(ctx, elset, schemas, evalCtx, k);
 
   if (isEmpty(elset)) {
     addError(result, "unknown-element", `${k} is unknown`);
     return;
   }
 
-  validateArrayType(result, elset, k, v)
+  validateArrayType(result, elset, k, v);
 
   if (Array.isArray(v)) {
     validateSchemasArray(ctx, result, elset, v);
@@ -602,33 +601,39 @@ function evalElement(ctx, result, schemas, evalCtx, k, v) {
 }
 
 function postValidate(ctx, result, evalCtx) {
-  each(evalCtx.multiChoice, (ch, chs)=>{
-    if(chs.length > 1){
+  each(evalCtx.multiChoice, (ch, chs) => {
+    if (chs.length > 1) {
       result.path.push(ch);
       addError(
         result,
         "choice",
-        `only one choice for ${ch} allowed, but multiple found: ${chs.join(', ')}`,
+        `only one choice for ${ch} allowed, but multiple found: ${chs.join(", ")}`,
       );
       result.path.pop(ch);
     }
   });
 }
 
-function addDynamicSchemas(ctx, schemas, data){
-  each(schemas, (schN, sch)=>{
-    if(sch.type && sch.type == 'Resource'){
-      addSchemasToSet(ctx, schemas, resolveSchema(ctx, data.resourceType), data.resourceType);
+function addDynamicSchemas(ctx, schemas, data) {
+  each(schemas, (schN, sch) => {
+    if (sch.type && sch.type == "Resource") {
+      addSchemasToSet(
+        ctx,
+        schemas,
+        resolveSchema(ctx, data.resourceType),
+        data.resourceType,
+      );
     }
-  })
+  });
 }
 
 function validateSchemas(ctx, result, schemas, data) {
+  addDynamicSchemas(ctx, schemas, data);
+  evalValidators(ctx, result, schemas, data);
 
-  addDynamicSchemas(ctx, schemas, data)
-  evalValidators(ctx, result, schemas, data)
-
-  if (!isMap(data)) { return }
+  if (!isMap(data)) {
+    return;
+  }
 
   let evalCtx = { multiChoice: {} };
 
@@ -636,22 +641,284 @@ function validateSchemas(ctx, result, schemas, data) {
   // but we have to validate - probably we should use the postValidate for that
   each(data, (k, v) => {
     result.path.push(k);
-    evalElement(ctx, result, schemas, evalCtx, k, v)
+    evalElement(ctx, result, schemas, evalCtx, k, v);
     result.path.pop();
   });
 
-  postValidate(ctx, result, evalCtx)
+  postValidate(ctx, result, evalCtx);
 }
 
 export function validate(ctx, schemaNames, data) {
   let schset = set();
   let result = { root: true, errors: [], path: [data?.resourceType] };
-  if(data.resourceType){
-    addSchemasToSet(ctx, schset, resolveSchema(ctx, data.resourceType), data.resourceType);
+  if (data.resourceType) {
+    addSchemasToSet(
+      ctx,
+      schset,
+      resolveSchema(ctx, data.resourceType),
+      data.resourceType,
+    );
   }
   schemaNames.forEach((x) => {
     addSchemasToSet(ctx, schset, resolveSchema(ctx, x), x);
   });
   validateSchemas(ctx, result, schset, data);
+  return { errors: result.errors };
+}
+
+// Properties to copy from element definitions during enumeration.
+const ENUM_ELEMENT_PROPS = [
+  "type",
+  "array",
+  "scalar",
+  "min",
+  "max",
+  "binding",
+  "required",
+  "excluded",
+  "fixed",
+  "pattern",
+  "constraints",
+  "refers",
+  "choices",
+  "choiceOf",
+  "modifier",
+  "mustSupport",
+  "summary",
+];
+
+/**
+ * Merges element metadata from a source element definition into a target element.
+ * Later definitions override earlier ones for most properties.
+ *
+ * @param {Object} target - The target element to merge into.
+ * @param {Object} source - The source element definition.
+ * @param {string} schemaName - The name of the schema providing this definition.
+ */
+function mergeElementMetadata(target, source, schemaName) {
+  // Track which schemas define or constrain this element.
+  if (!target.definedIn) {
+    target.definedIn = [];
+  }
+  if (!target.definedIn.includes(schemaName)) {
+    target.definedIn.push(schemaName);
+  }
+
+  // Copy properties from source to target.
+  ENUM_ELEMENT_PROPS.forEach((prop) => {
+    if (source[prop] !== undefined) {
+      target[prop] = source[prop];
+    }
+  });
+}
+
+/**
+ * Recursively enumerates elements from a set of schemas, expanding type references.
+ *
+ * @param {Object} ctx - Context object with schemaResolver callback.
+ * @param {Object} schemas - Set of schemas to enumerate from.
+ * @param {Set} visited - Set of type names already visited (for cycle detection).
+ * @returns {Object} Nested element structure.
+ */
+function enumerateSchemaElements(ctx, schemas, visited) {
+  const result = {};
+
+  // Collect all unique element keys from all schemas in the set.
+  const allElementKeys = new Set();
+  each(schemas, (schemaName, schema) => {
+    if (schema.elements) {
+      Object.keys(schema.elements).forEach((key) => allElementKeys.add(key));
+    }
+  });
+
+  // Process each element key.
+  allElementKeys.forEach((elementKey) => {
+    const elementDef = {};
+
+    // Collect element definitions from all schemas (base schemas first).
+    // We iterate in order of the schemas object which has base schemas added first.
+    each(schemas, (schemaName, schema) => {
+      const elemSchema = schema.elements?.[elementKey];
+      if (elemSchema) {
+        mergeElementMetadata(elementDef, elemSchema, schemaName);
+      }
+    });
+
+    // If this element has a type reference to a complex type, expand its elements.
+    if (elementDef.type && !visited.has(elementDef.type)) {
+      try {
+        const typeSchema = ctx.schemaResolver(elementDef.type);
+        if (typeSchema && typeSchema.kind !== "primitive-type") {
+          // Build schema set for the type (includes its base types).
+          const typeSchemaSet = {};
+          addSchemasToSet(ctx, typeSchemaSet, typeSchema, elementDef.type);
+
+          // Recursively enumerate the type's elements.
+          const newVisited = new Set(visited);
+          newVisited.add(elementDef.type);
+          const nestedElements = enumerateSchemaElements(
+            ctx,
+            typeSchemaSet,
+            newVisited,
+          );
+          if (Object.keys(nestedElements).length > 0) {
+            elementDef.elements = nestedElements;
+          }
+        }
+      } catch (e) {
+        // Type could not be resolved, skip nested expansion.
+      }
+    }
+
+    result[elementKey] = elementDef;
+  });
+
+  // Handle extensions - add slicing info if any schema defines extensions.
+  let hasExtensions = false;
+  const slices = {};
+  each(schemas, (schemaName, schema) => {
+    if (schema.extensions) {
+      hasExtensions = true;
+      each(schema.extensions, (extName, ext) => {
+        slices[extName] = {
+          url: ext.url,
+          min: ext.min,
+          max: ext.max,
+        };
+      });
+    }
+  });
+
+  if (hasExtensions && result.extension) {
+    result.extension.slicing = { slices };
+  }
+
+  return result;
+}
+
+/**
+ * Enumerates all elements of a schema (including inherited elements) and returns
+ * their metadata in a nested structure mirroring the schema hierarchy.
+ *
+ * @param {Object} ctx - Context object with schemaResolver callback.
+ * @param {string[]} schemaNames - Array of schema names/URLs to enumerate.
+ * @returns {Object} Nested element structure with type, binding, and other metadata.
+ */
+export function enumerateElements(ctx, schemaNames) {
+  // Build the initial schema set from all provided schema names.
+  const schemaSet = {};
+  schemaNames.forEach((name) => {
+    const schema = resolveSchema(ctx, name);
+    addSchemasToSet(ctx, schemaSet, schema, name);
+  });
+
+  // Enumerate elements from the schema set.
+  const visited = new Set();
+  return enumerateSchemaElements(ctx, schemaSet, visited);
+}
+
+/**
+ * Navigates through a schema set following the given path segments and returns
+ * the schemas applicable to the element at that path.
+ *
+ * @param {Object} ctx - Context object with schemaResolver callback.
+ * @param {Object} schemas - Current set of schemas.
+ * @param {string[]} path - Array of path segments to navigate.
+ * @returns {Object|null} The schema set for the target element, or null if path is invalid.
+ */
+function navigateToElement(ctx, schemas, path) {
+  let currentSchemas = schemas;
+
+  for (const segment of path) {
+    const elset = {};
+    const evalCtx = { multiChoice: {} };
+
+    // Collect schemas for this element from all current schemas.
+    collectSchemasForElement(ctx, elset, currentSchemas, evalCtx, segment);
+
+    if (isEmpty(elset)) {
+      return null; // Path segment not found.
+    }
+
+    currentSchemas = elset;
+  }
+
+  return currentSchemas;
+}
+
+/**
+ * Validates a single value for an element at a given path against all applicable
+ * constraints, including inherited constraints from base schemas.
+ *
+ * @param {Object} ctx - Context object with schemaResolver callback.
+ * @param {string[]} schemaNames - Array of schema names/URLs to validate against.
+ * @param {string[]} path - Array path to the element, e.g., ["name", "family"].
+ * @param {any} value - The value to validate.
+ * @returns {Object} Validation result with errors array.
+ */
+export function validateElementValue(ctx, schemaNames, path, value) {
+  // Build the initial schema set from all provided schema names.
+  const schemaSet = {};
+  schemaNames.forEach((name) => {
+    const schema = resolveSchema(ctx, name);
+    addSchemasToSet(ctx, schemaSet, schema, name);
+  });
+
+  // If path is empty, validate the entire value as a resource.
+  if (path.length === 0) {
+    const result = { errors: [], path: [] };
+    validateSchemas(ctx, result, schemaSet, value);
+    return { errors: result.errors };
+  }
+
+  // Navigate to the target element.
+  const targetSchemas = navigateToElement(ctx, schemaSet, path);
+
+  if (targetSchemas === null) {
+    // Path not found - return unknown element error.
+    return {
+      errors: [
+        {
+          type: "unknown-element",
+          path: path[path.length - 1],
+          message: `${path[path.length - 1]} is unknown`,
+        },
+      ],
+    };
+  }
+
+  // Create result object with the path.
+  const result = { errors: [], path: [...path] };
+
+  // Check if element expects array vs scalar.
+  const expectsArray = isElementArray(targetSchemas);
+
+  if (Array.isArray(value)) {
+    if (!expectsArray) {
+      addError(
+        result,
+        "not-singular",
+        `${path[path.length - 1]} is not singular`,
+      );
+    } else {
+      // Validate array cardinality.
+      validateSchemasArray(ctx, result, targetSchemas, value);
+
+      // Validate each array item.
+      value.forEach((item, i) => {
+        result.path.push(i);
+        validateSchemas(ctx, result, targetSchemas, item);
+        result.path.pop();
+      });
+    }
+  } else {
+    if (expectsArray) {
+      addError(result, "not-array", `${path[path.length - 1]} is not array`);
+    } else {
+      // Validate the single value.
+      validateSchemas(ctx, result, targetSchemas, value);
+    }
+  }
+
   return { errors: result.errors };
 }
