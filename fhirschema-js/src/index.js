@@ -398,13 +398,21 @@ function isReferenceOnResource(ref) {
   return ref === "Resource";
 }
 
-function addSchemasToSet(ctx, set, schema, schemaName) {
+function addSchemasToSet(ctx, set, schema, schemaName, visited = new Set()) {
   schema.name ||= schemaName;
   if (schema) {
+    // Track visited schemas to prevent circular reference loops.
+    const key = schema.name || schemaName;
+    if (visited.has(key)) {
+      return;
+    }
+    visited.add(key);
+
+    // Process base and type references first (for correct inheritance order).
     if (schema.base && !set[schema.base]) {
       let sch = resolveSchema(ctx, schema.base);
       if (sch) {
-        addSchemasToSet(ctx, set, sch, schema.base);
+        addSchemasToSet(ctx, set, sch, schema.base, visited);
       } else {
         console.assert(false, `Schema ${name} is not found`);
       }
@@ -412,12 +420,13 @@ function addSchemasToSet(ctx, set, schema, schemaName) {
     if (schema.type && !set[schema.type] && schema.kind !== "primitive-type") {
       let sch = resolveSchema(ctx, schema.type);
       if (sch) {
-        addSchemasToSet(ctx, set, sch, schema.type);
+        addSchemasToSet(ctx, set, sch, schema.type, visited);
       } else {
         console.assert(false, `Schema ${name} is not found`);
       }
     }
 
+    // Add current schema last (so derived overrides base).
     if (schema.name) {
       set[schema.name] = schema;
     } else {
