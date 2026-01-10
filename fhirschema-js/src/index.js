@@ -157,12 +157,6 @@ function validateMin(ctx, result, schema, data) {
   }
 }
 
-function validateArray(ctx, result, schema, data) {
-  if (!Array.isArray(data)) {
-    addError(result, "not-array", "expected array");
-  }
-}
-
 function validateElements(ctx, result, schema, data) {
   let type = getType(data);
   if (type !== "object") {
