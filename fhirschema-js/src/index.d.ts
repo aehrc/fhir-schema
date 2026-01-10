@@ -48,6 +48,9 @@ export interface FhirElementDefinition {
   modifier?: boolean;
   mustSupport?: boolean;
   summary?: boolean;
+  path?: string;
+  short?: string;
+  definition?: string;
 }
 
 /**
@@ -98,6 +101,9 @@ export interface EnumeratedElement {
   modifier?: boolean;
   mustSupport?: boolean;
   summary?: boolean;
+  path?: string;
+  short?: string;
+  definition?: string;
   /** Array of schema names that define or constrain this element. */
   definedIn?: string[];
   /** Nested elements for complex types. */

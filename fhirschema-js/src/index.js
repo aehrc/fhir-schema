@@ -694,6 +694,9 @@ const ENUM_ELEMENT_PROPS = [
   "modifier",
   "mustSupport",
   "summary",
+  "path",
+  "short",
+  "definition",
 ];
 
 /**

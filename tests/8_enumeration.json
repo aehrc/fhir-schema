@@ -8,8 +8,19 @@
     "code": { "kind": "primitive-type" },
     "HumanName": {
       "elements": {
-        "family": { "type": "string" },
-        "given": { "type": "string", "array": true }
+        "family": {
+          "type": "string",
+          "path": "HumanName.family",
+          "short": "Family name (often called 'Surname')",
+          "definition": "The part of a name that links to the genealogy."
+        },
+        "given": {
+          "type": "string",
+          "array": true,
+          "path": "HumanName.given",
+          "short": "Given names (not always 'first')",
+          "definition": "Given name."
+        }
       }
     },
     "Resource": {
@@ -96,10 +107,19 @@
           "array": true,
           "definedIn": ["Patient"],
           "elements": {
-            "family": { "type": "string", "definedIn": ["HumanName"] },
+            "family": {
+              "type": "string",
+              "path": "HumanName.family",
+              "short": "Family name (often called 'Surname')",
+              "definition": "The part of a name that links to the genealogy.",
+              "definedIn": ["HumanName"]
+            },
             "given": {
               "type": "string",
               "array": true,
+              "path": "HumanName.given",
+              "short": "Given names (not always 'first')",
+              "definition": "Given name.",
               "definedIn": ["HumanName"]
             }
           }
@@ -142,10 +162,19 @@
           "min": 1,
           "definedIn": ["Patient", "USCorePatient"],
           "elements": {
-            "family": { "type": "string", "definedIn": ["HumanName"] },
+            "family": {
+              "type": "string",
+              "path": "HumanName.family",
+              "short": "Family name (often called 'Surname')",
+              "definition": "The part of a name that links to the genealogy.",
+              "definedIn": ["HumanName"]
+            },
             "given": {
               "type": "string",
               "array": true,
+              "path": "HumanName.given",
+              "short": "Given names (not always 'first')",
+              "definition": "Given name.",
               "definedIn": ["HumanName"]
             }
           }
