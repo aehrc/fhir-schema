@@ -1,66 +1,80 @@
-import https from "https";
-import zlib from "zlib";
+/**
+ * Utility functions for loading FHIR Schema packages from the registry.
+ *
+ * Uses the fetch API and DecompressionStream for browser and Node.js compatibility.
+ *
+ * @author John Grimes
+ */
 
 const packageRegistryUrl =
   "https://storage.googleapis.com/fhir-schema-registry/1.0.0/";
 
+/**
+ * Builds the URL for a package's NDJSON.gz file.
+ *
+ * @param {string} packageCoordinate - Package coordinate (e.g., "hl7.fhir.r4.core#4.0.1").
+ * @returns {string} The URL for the package file.
+ */
 function buildPackageFileUrl(packageCoordinate) {
   return `${packageRegistryUrl}${encodeURIComponent(packageCoordinate)}/package.ndjson.gz`;
 }
 
+/**
+ * Fetches and decompresses a gzipped NDJSON file, returning a specific line.
+ *
+ * @param {string} url - The URL to fetch.
+ * @param {number} targetLine - The 1-based line number to retrieve.
+ * @returns {Promise<Object|null>} The parsed JSON object from the target line, or null if not found.
+ */
 async function getSpecificLineFromNdjson(url, targetLine) {
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, (response) => {
-        if (response.statusCode !== 200) {
-          return resolve(null);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return null;
+    }
+
+    const reader = response.body
+      .pipeThrough(new DecompressionStream("gzip"))
+      .pipeThrough(new TextDecoderStream())
+      .getReader();
+
+    let currentLine = 0;
+    let lineBuffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      lineBuffer += value;
+
+      while (lineBuffer.indexOf("\n") !== -1) {
+        const newlineIndex = lineBuffer.indexOf("\n");
+        const line = lineBuffer.slice(0, newlineIndex);
+        lineBuffer = lineBuffer.slice(newlineIndex + 1);
+        currentLine++;
+
+        if (currentLine === targetLine) {
+          reader.cancel();
+          return JSON.parse(line);
         }
+      }
+    }
 
-        const gunzip = zlib.createGunzip();
-        const stream = response.pipe(gunzip);
-
-        let currentLine = 0;
-        let lineBuffer = "";
-
-        stream.on("data", (chunk) => {
-          lineBuffer += chunk.toString();
-
-          while (lineBuffer.indexOf("\n") !== -1) {
-            const newlineIndex = lineBuffer.indexOf("\n");
-            const line = lineBuffer.slice(0, newlineIndex); // drop \n
-            lineBuffer = lineBuffer.slice(newlineIndex + 1);
-            currentLine++;
-
-            if (currentLine === targetLine) {
-              try {
-                const parsedLine = JSON.parse(line);
-                stream.destroy();
-                return resolve(parsedLine);
-              } catch (err) {
-                return reject(
-                  new Error("Failed to parse JSON: " + err.message),
-                );
-              }
-            }
-          }
-        });
-
-        stream.on("end", () => {
-          if (currentLine < targetLine) {
-            reject(`Finished preliminary, before target line#: ${targetLine}`);
-          }
-        });
-
-        stream.on("error", (err) => {
-          reject(err);
-        });
-      })
-      .on("error", (err) => {
-        resolve(null);
-      });
-  });
+    return null;
+  } catch {
+    return null;
+  }
 }
 
+/**
+ * Gets the package metadata (first line of the NDJSON file).
+ *
+ * @param {string} packageCoordinate - Package coordinate.
+ * @returns {Promise<Object|null>} The package metadata object.
+ */
 async function getPackageMeta(packageCoordinate) {
   return await getSpecificLineFromNdjson(
     buildPackageFileUrl(packageCoordinate),
@@ -68,6 +82,12 @@ async function getPackageMeta(packageCoordinate) {
   );
 }
 
+/**
+ * Gets the dependencies for a package.
+ *
+ * @param {string} packageCoordinate - Package coordinate.
+ * @returns {Promise<string[]>} Array of dependency package coordinates.
+ */
 async function getPackageDeps(packageCoordinate) {
   const packageMeta = await getPackageMeta(packageCoordinate);
   if (!packageMeta) {
@@ -77,18 +97,44 @@ async function getPackageDeps(packageCoordinate) {
   return packageDeps;
 }
 
+/**
+ * Normalizes package dependencies by removing the leading character.
+ *
+ * @param {string[]|undefined} packageDeps - Raw dependency array.
+ * @returns {string[]} Normalized dependency array.
+ */
 function normalizePackageDeps(packageDeps) {
   return packageDeps ? packageDeps.map((d) => d.slice(1)) : [];
 }
 
+/**
+ * Identity function.
+ *
+ * @param {*} x - Input value.
+ * @returns {*} The same value.
+ */
 function identity(x) {
   return x;
 }
 
+/**
+ * Returns the difference between two sets.
+ *
+ * @param {Set} setA - First set.
+ * @param {Set} setB - Second set.
+ * @returns {Set} Elements in setA that are not in setB.
+ */
 function difference(setA, setB) {
   return new Set([...setA].filter((x) => !setB.has(x)));
 }
 
+/**
+ * Recursively resolves all dependencies for a set of packages.
+ *
+ * @param {Set<string>} visitedDeps - Already visited dependencies.
+ * @param {Set<string>} enqueuedDeps - Dependencies to process.
+ * @returns {Promise<string[]>} All resolved dependencies.
+ */
 async function dependencyResolver(visitedDeps, enqueuedDeps) {
   if (enqueuedDeps.size === 0) {
     return Array.from(visitedDeps);
@@ -106,12 +152,12 @@ async function dependencyResolver(visitedDeps, enqueuedDeps) {
   }
 }
 
-async function obtainPackageDeps(packageCoordinate) {
-  const rootDeps = await getPackageDeps(packageCoordinate);
-  const fullDepsTree = await dependencyResolver(new Set(), new Set(rootDeps));
-  return fullDepsTree;
-}
-
+/**
+ * Resolves all dependencies for a set of package coordinates.
+ *
+ * @param {string[]} packageCoordinates - Package coordinates.
+ * @returns {Promise<string[]>} All packages including dependencies.
+ */
 async function resolveDeps(packageCoordinates) {
   const fullDepsTree = await dependencyResolver(
     new Set(),
@@ -122,6 +168,7 @@ async function resolveDeps(packageCoordinates) {
 
 /**
  * Loads all FHIR Schema entries from a package's NDJSON.gz file into a map.
+ *
  * The package format contains metadata and StructureDefinitions first, followed
  * by a delimiter line ["fhir-schema/delimiter"], then FHIR Schema entries.
  *
@@ -132,58 +179,60 @@ async function loadPackageSchemas(packageCoordinate) {
   const url = buildPackageFileUrl(packageCoordinate);
   const schemas = {};
 
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, (response) => {
-        if (response.statusCode !== 200) {
-          return reject(
-            new Error(`Failed to fetch package: ${packageCoordinate}`),
-          );
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch package: ${packageCoordinate}`);
+  }
+
+  const reader = response.body
+    .pipeThrough(new DecompressionStream("gzip"))
+    .pipeThrough(new TextDecoderStream())
+    .getReader();
+
+  let buffer = "";
+  let pastDelimiter = false;
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffer += value;
+    let newlineIndex;
+
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+
+      if (!line.trim()) continue;
+
+      // Check for the FHIR Schema delimiter.
+      if (line.includes("fhir-schema/delimiter")) {
+        pastDelimiter = true;
+        continue;
+      }
+
+      // Only process FHIR Schema entries after the delimiter.
+      // FHIR Schemas have 'elements' as an object, or are primitive types.
+      // StructureDefinitions have 'differential' instead.
+      if (pastDelimiter) {
+        const schema = JSON.parse(line);
+        const hasElements =
+          schema.elements &&
+          typeof schema.elements === "object" &&
+          !Array.isArray(schema.elements);
+        const isPrimitive = schema.kind === "primitive-type";
+        if (hasElements || isPrimitive) {
+          if (schema.name) schemas[schema.name] = schema;
+          if (schema.url) schemas[schema.url] = schema;
         }
+      }
+    }
+  }
 
-        const gunzip = zlib.createGunzip();
-        const stream = response.pipe(gunzip);
-        let buffer = "";
-        let pastDelimiter = false;
-
-        stream.on("data", (chunk) => {
-          buffer += chunk.toString();
-          let newlineIndex;
-          while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-            const line = buffer.slice(0, newlineIndex);
-            buffer = buffer.slice(newlineIndex + 1);
-
-            if (!line.trim()) continue;
-
-            // Check for the FHIR Schema delimiter.
-            if (line.includes("fhir-schema/delimiter")) {
-              pastDelimiter = true;
-              continue;
-            }
-
-            // Only process FHIR Schema entries after the delimiter.
-            // FHIR Schemas have 'elements' as an object, or are primitive types.
-            // StructureDefinitions have 'differential' instead.
-            if (pastDelimiter) {
-              const schema = JSON.parse(line);
-              const hasElements =
-                schema.elements &&
-                typeof schema.elements === "object" &&
-                !Array.isArray(schema.elements);
-              const isPrimitive = schema.kind === "primitive-type";
-              if (hasElements || isPrimitive) {
-                if (schema.name) schemas[schema.name] = schema;
-                if (schema.url) schemas[schema.url] = schema;
-              }
-            }
-          }
-        });
-
-        stream.on("end", () => resolve(schemas));
-        stream.on("error", reject);
-      })
-      .on("error", reject);
-  });
+  return schemas;
 }
 
 /**
