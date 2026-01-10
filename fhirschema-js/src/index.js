@@ -351,10 +351,12 @@ let ARRAY_VALIDATORS = {
   min: validateMin,
 };
 
-function resolveSchema(ctx, schemaName) {
+function resolveSchema(ctx, schemaName, optional = false) {
   let sch = ctx.schemaResolver(schemaName);
   if (sch) {
     return sch;
+  } else if (optional) {
+    return null;
   } else {
     throw new Error("could not resolve [" + JSON.stringify(schemaName) + "]");
   }
@@ -403,20 +405,17 @@ function addSchemasToSet(ctx, set, schema, schemaName, visited = new Set()) {
     visited.add(key);
 
     // Process base and type references first (for correct inheritance order).
+    // Use optional resolution since abstract base types like "Base" may not be in registry.
     if (schema.base && !set[schema.base]) {
-      let sch = resolveSchema(ctx, schema.base);
+      let sch = resolveSchema(ctx, schema.base, true);
       if (sch) {
         addSchemasToSet(ctx, set, sch, schema.base, visited);
-      } else {
-        console.assert(false, `Schema ${name} is not found`);
       }
     }
     if (schema.type && !set[schema.type] && schema.kind !== "primitive-type") {
-      let sch = resolveSchema(ctx, schema.type);
+      let sch = resolveSchema(ctx, schema.type, true);
       if (sch) {
         addSchemasToSet(ctx, set, sch, schema.type, visited);
-      } else {
-        console.assert(false, `Schema ${name} is not found`);
       }
     }
 
