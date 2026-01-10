@@ -181,7 +181,8 @@ async function loadPackageSchemas(packageCoordinate) {
 
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to fetch package: ${packageCoordinate}`);
+    console.warn(`Package not found in registry: ${packageCoordinate}`);
+    return schemas;
   }
 
   const reader = response.body
