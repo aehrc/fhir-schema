@@ -1,8 +1,17 @@
 {
-  "name": "fhir-schema",
+  "name": "@aehrc/fhir-schema",
+  "version": "0.1.0-dev.0",
   "type": "module",
   "main": "src/index.js",
   "types": "src/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aehrc/fhir-schema.git",
+    "directory": "fhirschema-js"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
