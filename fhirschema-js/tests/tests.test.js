@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  validate,
-  enumerateElements,
-  validateElementValue,
-} from "../src/index.js";
+import { validate, enumerateElements } from "../src/index.js";
 import _ from "lodash";
 
 // Validation test cases.
@@ -19,11 +15,6 @@ const validationCases = [
 
 // Element enumeration test cases.
 const enumerationCases = [require("../../tests/8_enumeration.json")];
-
-// Element value validation test cases.
-const elementValidationCases = [
-  require("../../tests/9_element_validation.json"),
-];
 
 // Run validation tests.
 validationCases.forEach((tcase) => {
@@ -70,24 +61,6 @@ enumerationCases.forEach((tcase) => {
             expect(_.isMatch(res[key], tst.expectedPartial[key])).toBe(true);
           });
         }
-      });
-    });
-  });
-});
-
-// Run element value validation tests.
-elementValidationCases.forEach((tcase) => {
-  let resolver = (url) => {
-    return tcase.schemas[url];
-  };
-  let ctx = { schemaResolver: resolver };
-  let desc = tcase.desc;
-  describe(desc, () => {
-    tcase.tests.forEach((tst) => {
-      if (tst.skip) return;
-      test(tst.desc, () => {
-        let res = validateElementValue(ctx, tst.schemas, tst.path, tst.value);
-        expect(res.errors).toEqual(tst.errors);
       });
     });
   });

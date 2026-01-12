@@ -152,23 +152,6 @@ export function enumerateElements(
 ): Record<string, EnumeratedElement>;
 
 /**
- * Validates a single value for an element at a given path against all
- * applicable constraints, including inherited constraints from base schemas.
- *
- * @param ctx - Context object with schemaResolver callback.
- * @param schemaNames - Array of schema names/URLs to validate against.
- * @param path - Array path to the element, e.g., ["name", "family"].
- * @param value - The value to validate.
- * @returns Validation result with errors array.
- */
-export function validateElementValue(
-  ctx: FhirSchemaContext,
-  schemaNames: string[],
-  path: string[],
-  value: unknown,
-): ValidationResult;
-
-/**
  * Validates a complete FHIR resource against one or more schemas.
  *
  * @param ctx - Context object with schemaResolver callback.
